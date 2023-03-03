@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: namespace-watcher
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: namespace-watcher
+  template:
+    metadata:
+      labels:
+        app: namespace-watcher
+    spec:
+      containers:
+      - name: namespace-watcher
+        image: wrkode/namespace-watcher:latest
+        command: ["/bin/sh"]
+        args: ["-c", "while true; do sleep 60; done"]
+        env:
+#        - name: POD_NAMESPACE
+        - name: CPU_LIMIT
+          value: "500m"
+        - name: MEM_LIMIT
+          value: "512Mi"
+        - name: EPHEMERAL_STORAGE_LIMIT
+          value: "2Gi"
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+      serviceAccountName: namespace-watcher
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: namespace-watcher
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: namespace-watcher
+rules:
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["watch"]
+- apiGroups: [""]
+  resources: ["limitranges"]
+  verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: namespace-watcher
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: namespace-watcher
+subjects:
+- kind: ServiceAccount
+  name: namespace-watcher
+  namespace: default
