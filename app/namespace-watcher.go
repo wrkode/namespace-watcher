@@ -17,7 +17,7 @@ import (
 
 func createLimitRange(clientset *kubernetes.Clientset, namespaceName string) error {
 
-	version := "v0.9"
+	version := "v1.0-alpha"
 
 	cpuLimitMax := os.Getenv("CPU_LIMIT_MAX")
 	memoryLimitMax := os.Getenv("MEM_LIMIT_MAX")
@@ -98,15 +98,15 @@ func main() {
 
 			//exclude cattle and system namespaces
 			if strings.Contains(namespaceName, "default") {
-				fmt.Printf("Skipping namespace %s\n", namespaceName)
+				log.Printf("Skipping namespace %s\n", namespaceName)
 				continue
 			}
 			if strings.Contains(namespaceName, "cattle") || strings.Contains(namespaceName, "kube-system") || strings.Contains(namespaceName, "kube-public") {
-				fmt.Printf("Skipping namespace %s\n", namespaceName)
+				log.Printf("Skipping namespace %s\n", namespaceName)
 				continue
 			}
 			if strings.Contains(namespaceName, "istio-system") || strings.Contains(namespaceName, "kube-public") || strings.Contains(namespaceName, "kube-local") {
-				fmt.Printf("Skipping namespace %s\n", namespaceName)
+				log.Printf("Skipping namespace %s\n", namespaceName)
 				continue
 			}
 
