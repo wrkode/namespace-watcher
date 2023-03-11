@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 
@@ -16,13 +17,24 @@ import (
 
 func createLimitRange(clientset *kubernetes.Clientset, namespaceName string) error {
 
+	version := "v0.9"
+
 	cpuLimitMax := os.Getenv("CPU_LIMIT_MAX")
 	memoryLimitMax := os.Getenv("MEM_LIMIT_MAX")
 	ephemeralStorageLimitMax := os.Getenv("EPHEMERAL_STORAGE_MAX")
 
 	cpuLimitMin := os.Getenv("CPU_LIMIT_MIN")
-	memoryLimitMin := os.Getenv("MEM_LIMIT_MAX")
-	ephemeralStorageLimitMin := os.Getenv("EPHEMERAL_STORAGE_MAX")
+	memoryLimitMin := os.Getenv("MEM_LIMIT_MIN")
+	ephemeralStorageLimitMin := os.Getenv("EPHEMERAL_STORAGE_MIN")
+	log.Printf("Namespace-Watcher version %s\n", version)
+
+	log.Println("Starting Namespace-Watcher with the folling parameters:")
+	log.Printf("CPU_LIMIT_MAX %s\n", cpuLimitMax)
+	log.Printf("CPU_LIMIT_MIN %s\n", cpuLimitMin)
+	log.Printf("MEM_LIMIT_MAX %s\n", memoryLimitMax)
+	log.Printf("MEM_LIMIT_MAX %s\n", memoryLimitMin)
+	log.Printf("EPHEMERAL_STORAGE_MAX %s\n", ephemeralStorageLimitMax)
+	log.Printf("EPHEMERAL_STORAGE_MAX %s\n", ephemeralStorageLimitMin)
 
 	limitRange := &corev1.LimitRange{
 		ObjectMeta: metav1.ObjectMeta{
@@ -57,6 +69,7 @@ func createLimitRange(clientset *kubernetes.Clientset, namespaceName string) err
 }
 
 func main() {
+
 	// create Kubernetes API client
 	config, err := rest.InClusterConfig()
 	if err != nil {
