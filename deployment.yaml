@@ -45,7 +45,7 @@ spec:
     spec:
       containers:
       - name: namespace-watcher
-        image: wrkode/namespace-watcher:v0.9
+        image: wrkode/namespace-watcher:v1.0-alpha
         env:
         - name: CPU_LIMIT_MAX
           value: "2"
