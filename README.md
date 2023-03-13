@@ -12,7 +12,7 @@ kube-apiserver must have the the following admission-plugins enabled:
 
 namespace-watcher, will not add limits to:
 
-- Any namespaces containing ```cattle`` in te name.
+- Any namespaces containing ```cattle``` in the name.
 - ```kube-system```
 - ```kube-public```
 - ```istio-system```
@@ -24,7 +24,7 @@ namespace-watcher, will not add limits to:
 A serviceaccount, ClusterRole and ClusterRoleBinding are created to allow namespace-watcher to observe and update namespaces.
 download the manifest deployment.yaml and run:
 ```kubectl apply -f deployment.yaml```
-namespace-watcher will be deployed in the ```kube-system``` namespace
+namespace-watcher will be deployed in the ```kube-system``` namespace.
 
 ## ToDo (future release)
 
