@@ -17,6 +17,7 @@ namespace-watcher, will not add limits to:
 - ```kube-public```
 - ```istio-system```
 - ```kube-local```
+- ```kube-node-lease```
 - ```default```
 
 ## Deployment
@@ -28,4 +29,4 @@ namespace-watcher will be deployed in the ```kube-system``` namespace.
 
 ## ToDo (future release)
 
-- Implement namespace exclusion as array in the manifest file
+- Implement namespace exclusion for user.

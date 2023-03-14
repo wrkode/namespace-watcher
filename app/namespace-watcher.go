@@ -105,7 +105,7 @@ func main() {
 				log.Printf("Skipping namespace %s\n", namespaceName)
 				continue
 			}
-			if strings.Contains(namespaceName, "istio-system") || strings.Contains(namespaceName, "kube-public") || strings.Contains(namespaceName, "kube-local") {
+			if strings.Contains(namespaceName, "istio-system") || strings.Contains(namespaceName, "kube-node-lease") || strings.Contains(namespaceName, "kube-local") {
 				log.Printf("Skipping namespace %s\n", namespaceName)
 				continue
 			}
