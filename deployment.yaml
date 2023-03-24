@@ -12,7 +12,7 @@ metadata:
 rules:
 - apiGroups: [""]
   resources: ["namespaces", "limitranges"]
-  verbs: ["get", "watch", "list", "create", "delete"]
+  verbs: ["get", "watch", "list", "create", "update", "delete"]
   
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -45,20 +45,20 @@ spec:
     spec:
       containers:
       - name: namespace-watcher
-        image: wrkode/namespace-watcher:v1.0-alpha6
+        image: wrkode/namespace-watcher:v1.0-alpha7
         env:
         - name: CPU_LIMIT_MAX
-          value: "500m"
+          value: "700m"
         - name: MEM_LIMIT_MAX
-          value: "1Gi"
+          value: "2Gi"
         - name: EPHEMERAL_STORAGE_MAX
-          value: "4Gi"
+          value: "8Gi"
         - name: CPU_LIMIT_MIN
           value: "250m"
         - name: MEM_LIMIT_MIN
           value: "512Mi"
         - name: EPHEMERAL_STORAGE_MIN
-          value: "2Gi"
+          value: "3Gi"
         - name: POD_NAMESPACE
           valueFrom:
             fieldRef:
