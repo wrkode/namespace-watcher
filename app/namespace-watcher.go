@@ -44,6 +44,38 @@ func readLimit() *Limits {
 */
 func createLimitRange(clientset *kubernetes.Clientset, namespaceName string, limits Limits) error {
 
+	//var log = logrus.New()
+
+	cpuLimitMin, err := resource.ParseQuantity(limits.CpuLimitMin)
+	if err != nil {
+		logrus.Fatalf("error parsing CPU_LIMIT_MIN %v:", err)
+	}
+
+	cpuLimitMax, err := resource.ParseQuantity(limits.CpuLimitMax)
+	if err != nil {
+		logrus.Fatalf("error parsing CPU_LIMIT_MAX %v:", err)
+	}
+
+	memLimtMin, err := resource.ParseQuantity(limits.MemLimitMin)
+	if err != nil {
+		logrus.Fatalf("error parsing MEM_LIMIT_MIN %v:", err)
+	}
+
+	memLimtMax, err := resource.ParseQuantity(limits.MemLimitMax)
+	if err != nil {
+		logrus.Fatalf("error parsing MEM_LIMIT_MAX %v:", err)
+	}
+
+	ephemeralStorageMin, err := resource.ParseQuantity(limits.EphemeralStorageLimitMin)
+	if err != nil {
+		logrus.Fatalf("error parsing EPHEMERAL_STORAGE_MIN %v:", err)
+	}
+
+	ephemeralStorageMax, err := resource.ParseQuantity(limits.EphemeralStorageLimitMax)
+	if err != nil {
+		logrus.Fatalf("error parsing EPHEMERAL_STORAGE_MAX %v:", err)
+	}
+
 	limitRange := &corev1.LimitRange{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "default-limits",
@@ -53,21 +85,21 @@ func createLimitRange(clientset *kubernetes.Clientset, namespaceName string, lim
 				{
 					Type: corev1.LimitTypePod,
 					Max: corev1.ResourceList{
-						corev1.ResourceCPU:              resource.MustParse(limits.CpuLimitMax),
-						corev1.ResourceMemory:           resource.MustParse(limits.MemLimitMax),
-						corev1.ResourceEphemeralStorage: resource.MustParse(limits.EphemeralStorageLimitMax),
+						corev1.ResourceCPU:              cpuLimitMax,
+						corev1.ResourceMemory:           memLimtMax,
+						corev1.ResourceEphemeralStorage: ephemeralStorageMax,
 					},
 					Min: corev1.ResourceList{
-						corev1.ResourceCPU:              resource.MustParse(limits.CpuLimitMin),
-						corev1.ResourceMemory:           resource.MustParse(limits.MemLimitMin),
-						corev1.ResourceEphemeralStorage: resource.MustParse(limits.EphemeralStorageLimitMin),
+						corev1.ResourceCPU:              cpuLimitMin,
+						corev1.ResourceMemory:           memLimtMin,
+						corev1.ResourceEphemeralStorage: ephemeralStorageMin,
 					},
 				},
 			},
 		},
 	}
 
-	_, err := clientset.CoreV1().LimitRanges(namespaceName).Create(context.Background(), limitRange, metav1.CreateOptions{})
+	_, err = clientset.CoreV1().LimitRanges(namespaceName).Create(context.Background(), limitRange, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
