@@ -7,6 +7,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
@@ -27,7 +28,7 @@ type Limits struct {
 
 var setLimits Limits
 
-func createLimitRange(clientset *kubernetes.Clientset, namespaceName string, limits Limits) error {
+func createOrUpdateLimitRange(clientset *kubernetes.Clientset, namespaceName string, limits Limits) error {
 
 	cpuLimitMin, err := resource.ParseQuantity(limits.CpuLimitMin)
 	if err != nil {
@@ -82,12 +83,31 @@ func createLimitRange(clientset *kubernetes.Clientset, namespaceName string, lim
 		},
 	}
 
-	_, err = clientset.CoreV1().LimitRanges(namespaceName).Create(context.Background(), limitRange, metav1.CreateOptions{})
+	// Get the existing LimitRange
+	existingLimitRange, err := clientset.CoreV1().LimitRanges(namespaceName).Get(context.Background(), limitRange.ObjectMeta.Name, metav1.GetOptions{})
 	if err != nil {
-		return err
+		if errors.IsNotFound(err) {
+
+			//Create LimitRange if it doesn't exist
+			_, err = clientset.CoreV1().LimitRanges(namespaceName).Create(context.Background(), limitRange, metav1.CreateOptions{})
+			if err != nil {
+				return err
+			}
+			logrus.Warn("Created LimitRange for namespace: ", namespaceName)
+		} else {
+			return err
+
+		}
+	} else {
+		// Update the existing LimitRange
+		existingLimitRange.Spec = limitRange.Spec
+		_, err = clientset.CoreV1().LimitRanges(namespaceName).Update(context.Background(), existingLimitRange, metav1.UpdateOptions{})
+		if err != nil {
+			return err
+		}
+		logrus.Warn("Updated LimitRange for namespace: ", namespaceName)
 	}
 
-	logrus.Warn("Created LimitRange for namespace: ", namespaceName)
 	return nil
 }
 
@@ -153,7 +173,7 @@ func main() {
 			logrus.Info("New namespace created: ", namespaceName)
 
 			// create a LimitRange for the new namespace
-			err := createLimitRange(clientset, namespaceName, setLimits)
+			err := createOrUpdateLimitRange(clientset, namespaceName, setLimits)
 			if err != nil {
 				logrus.Warn("Failed to create LimitRange for namespace: ", namespaceName, " ", err)
 			}
