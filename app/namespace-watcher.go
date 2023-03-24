@@ -16,23 +16,33 @@ import (
 
 const version = "v1.0-alpha"
 
-func createLimitRange(clientset *kubernetes.Clientset, namespaceName string) error {
+type Limits struct {
+	CpuLimitMax              string
+	MemLimitMax              string
+	EphemeralStorageLimitMax string
+	CpuLimitMin              string
+	MemLimitMin              string
+	EphemeralStorageLimitMin string
+}
 
-	cpuLimitMax := os.Getenv("CPU_LIMIT_MAX")
-	memoryLimitMax := os.Getenv("MEM_LIMIT_MAX")
-	ephemeralStorageLimitMax := os.Getenv("EPHEMERAL_STORAGE_MAX")
+var setLimits Limits
 
-	cpuLimitMin := os.Getenv("CPU_LIMIT_MIN")
-	memoryLimitMin := os.Getenv("MEM_LIMIT_MIN")
-	ephemeralStorageLimitMin := os.Getenv("EPHEMERAL_STORAGE_MIN")
+/*
+func readLimit() *Limits {
 
-	logrus.Info("Starting Namespace-Watcher with the folling parameters:")
-	logrus.Info("CPU_LIMIT_MAX %s\n", cpuLimitMax)
-	logrus.Info("CPU_LIMIT_MIN %s\n", cpuLimitMin)
-	logrus.Info("MEM_LIMIT_MAX %s\n", memoryLimitMax)
-	logrus.Info("MEM_LIMIT_MAX %s\n", memoryLimitMin)
-	logrus.Info("EPHEMERAL_STORAGE_MAX %s\n", ephemeralStorageLimitMax)
-	logrus.Info("EPHEMERAL_STORAGE_MAX %s\n", ephemeralStorageLimitMin)
+	cpuLimitMax := Limits{CpuLimitMax: os.Getenv("CPU_LIMIT_MAX")}
+	memoryLimitMax := Limits{MemLimitMax: os.Getenv("MEM_LIMIT_MAX")}
+	ephemeralStorageLimitMax := Limits{EphemeralStorageLimitMax: os.Getenv("EPHEMERAL_STORAGE_MAX")}
+
+	cpuLimitMin := Limits{CpuLimitMin: os.Getenv("CPU_LIMIT_MIN")}
+	memoryLimitMin := Limits{MemLimitMin: os.Getenv("MEM_LIMIT_MIN")}
+	ephemeralStorageLimitMin := Limits{EphemeralStorageLimitMin: os.Getenv("EPHEMERAL_STORAGE_MIN")}
+
+	return &Limits
+
+}
+*/
+func createLimitRange(clientset *kubernetes.Clientset, namespaceName string, limits Limits) error {
 
 	limitRange := &corev1.LimitRange{
 		ObjectMeta: metav1.ObjectMeta{
@@ -43,14 +53,14 @@ func createLimitRange(clientset *kubernetes.Clientset, namespaceName string) err
 				{
 					Type: corev1.LimitTypePod,
 					Max: corev1.ResourceList{
-						corev1.ResourceCPU:              resource.MustParse(cpuLimitMax),
-						corev1.ResourceMemory:           resource.MustParse(memoryLimitMax),
-						corev1.ResourceEphemeralStorage: resource.MustParse(ephemeralStorageLimitMax),
+						corev1.ResourceCPU:              resource.MustParse(limits.CpuLimitMax),
+						corev1.ResourceMemory:           resource.MustParse(limits.MemLimitMax),
+						corev1.ResourceEphemeralStorage: resource.MustParse(limits.EphemeralStorageLimitMax),
 					},
 					Min: corev1.ResourceList{
-						corev1.ResourceCPU:              resource.MustParse(cpuLimitMin),
-						corev1.ResourceMemory:           resource.MustParse(memoryLimitMin),
-						corev1.ResourceEphemeralStorage: resource.MustParse(ephemeralStorageLimitMin),
+						corev1.ResourceCPU:              resource.MustParse(limits.CpuLimitMin),
+						corev1.ResourceMemory:           resource.MustParse(limits.MemLimitMin),
+						corev1.ResourceEphemeralStorage: resource.MustParse(limits.EphemeralStorageLimitMin),
 					},
 				},
 			},
@@ -69,6 +79,21 @@ func createLimitRange(clientset *kubernetes.Clientset, namespaceName string) err
 func main() {
 
 	logrus.Info("Namespace-Watcher version %s\n", version)
+
+	setLimits.CpuLimitMax = os.Getenv("CPU_LIMIT_MAX")
+	setLimits.MemLimitMax = os.Getenv("CPU_LIMIT_MAX")
+	setLimits.EphemeralStorageLimitMax = os.Getenv("EPHEMERAL_STORAGE_MAX")
+	setLimits.CpuLimitMin = os.Getenv("CPU_LIMIT_MIN")
+	setLimits.MemLimitMin = os.Getenv("MEM_LIMIT_MIN")
+	setLimits.EphemeralStorageLimitMin = os.Getenv("EPHEMERAL_STORAGE_MIN")
+
+	logrus.Info("Starting Namespace-Watcher with the folling parameters:")
+	logrus.Info("CPU_LIMIT_MIN %s\n", setLimits.CpuLimitMin)
+	logrus.Info("CPU_LIMIT_MAX %s\n", setLimits.CpuLimitMax)
+	logrus.Info("MEM_LIMIT_MIN %s\n", setLimits.MemLimitMin)
+	logrus.Info("MEM_LIMIT_MAX %s\n", setLimits.MemLimitMax)
+	logrus.Info("EPHEMERAL_STORAGE_MIN %s\n", setLimits.EphemeralStorageLimitMin)
+	logrus.Info("EPHEMERAL_STORAGE_MAX %s\n", setLimits.EphemeralStorageLimitMax)
 
 	// create Kubernetes API client
 	config, err := rest.InClusterConfig()
@@ -113,7 +138,7 @@ func main() {
 			logrus.Info("New namespace created: %s\n", namespaceName)
 
 			// create a LimitRange for the new namespace
-			err := createLimitRange(clientset, namespaceName)
+			err := createLimitRange(clientset, namespaceName, setLimits)
 			if err != nil {
 				logrus.Fatal("Failed to create LimitRange for namespace %s: %v\n", namespaceName, err)
 			}
