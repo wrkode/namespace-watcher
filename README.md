@@ -1,7 +1,8 @@
 # Namespace-watcher
 
 A Kubernetes Namespace Watcher.
-namespace-watcher will watch the Kubernetes Event Stream and add LimitRange ```default-limits``` for CPU, MEM and epheremeral-storage to any new namespace created
+namespace-watcher will watch the Kubernetes Event Stream and will add a LimitRange named ```default-limits``` for CPU, MEM and epheremeral-storage to any new namespace created. If the ```default-limits``` exists, it will be updated with the parameters defined in the manifest.
+All limits (MIN, MAX) are required fields.
 
 ## Requirements
 
@@ -22,7 +23,7 @@ namespace-watcher, will not add limits to:
 
 ## Deployment
 
-A serviceaccount, ClusterRole and ClusterRoleBinding are created to allow namespace-watcher to observe and update namespaces.
+The necessary serviceaccount, ClusterRole and ClusterRoleBinding are created in the manifest ```deployment.yaml``` to allow namespace-watcher to observe and update namespaces.
 download the manifest deployment.yaml and run:
 ```kubectl apply -f deployment.yaml```
 namespace-watcher will be deployed in the ```kube-system``` namespace.

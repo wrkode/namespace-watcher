@@ -45,14 +45,14 @@ spec:
     spec:
       containers:
       - name: namespace-watcher
-        image: wrkode/namespace-watcher:v1.0-alpha7
+        image: wrkode/namespace-watcher:v1.0-alpha8
         env:
         - name: CPU_LIMIT_MAX
           value: "700m"
         - name: MEM_LIMIT_MAX
           value: "2Gi"
         - name: EPHEMERAL_STORAGE_MAX
-          value: "8Gi"
+          value: "9Gi"
         - name: CPU_LIMIT_MIN
           value: "250m"
         - name: MEM_LIMIT_MIN

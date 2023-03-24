@@ -15,7 +15,7 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-const version = "v1.0-alpha6"
+const version = "v1.0-alpha8"
 
 type Limits struct {
 	CpuLimitMax              string
@@ -111,16 +111,41 @@ func createOrUpdateLimitRange(clientset *kubernetes.Clientset, namespaceName str
 	return nil
 }
 
+func lookupEnvOrEmpty(key string) string {
+	value, _ := os.LookupEnv(key)
+
+	return value
+}
+
 func main() {
 
 	logrus.Info("Namespace-Watcher version ", version)
 
-	setLimits.CpuLimitMin = os.Getenv("CPU_LIMIT_MIN")
-	setLimits.CpuLimitMax = os.Getenv("CPU_LIMIT_MAX")
-	setLimits.MemLimitMin = os.Getenv("MEM_LIMIT_MIN")
-	setLimits.MemLimitMax = os.Getenv("MEM_LIMIT_MAX")
-	setLimits.EphemeralStorageLimitMin = os.Getenv("EPHEMERAL_STORAGE_MIN")
-	setLimits.EphemeralStorageLimitMax = os.Getenv("EPHEMERAL_STORAGE_MAX")
+	//Evaluate if environment variables are not set or set to ""
+	setLimits.CpuLimitMin = lookupEnvOrEmpty("CPU_LIMIT_MIN")
+	if setLimits.CpuLimitMin == "" || len(strings.TrimSpace(setLimits.CpuLimitMin)) == 0 {
+		logrus.Fatal("Environment variable CPU_LIMIT_MIN is not set or empty: ", setLimits.CpuLimitMin)
+	}
+	setLimits.CpuLimitMax = lookupEnvOrEmpty("CPU_LIMIT_MAX")
+	if setLimits.CpuLimitMax == "" || len(strings.TrimSpace(setLimits.CpuLimitMax)) == 0 {
+		logrus.Fatal("Environment variable CPU_LIMIT_MAX is not set or empty: ", setLimits.CpuLimitMax)
+	}
+	setLimits.MemLimitMin = lookupEnvOrEmpty("MEM_LIMIT_MIN")
+	if setLimits.MemLimitMin == "" || len(strings.TrimSpace(setLimits.MemLimitMin)) == 0 {
+		logrus.Fatal("Environment variable MEM_LIMIT_MIN is not set or empty: ", setLimits.MemLimitMin)
+	}
+	setLimits.MemLimitMax = lookupEnvOrEmpty("MEM_LIMIT_MAX")
+	if setLimits.MemLimitMax == "" || len(strings.TrimSpace(setLimits.MemLimitMax)) == 0 {
+		logrus.Fatal("Environment variable MEM_LIMIT_MAX is not set or empty: ", setLimits.MemLimitMax)
+	}
+	setLimits.EphemeralStorageLimitMin = lookupEnvOrEmpty("EPHEMERAL_STORAGE_MIN")
+	if setLimits.EphemeralStorageLimitMin == "" || len(strings.TrimSpace(setLimits.EphemeralStorageLimitMin)) == 0 {
+		logrus.Fatal("Environment variable EPHEMERAL_STORAGE_MIN is not set or empty: ", setLimits.EphemeralStorageLimitMin)
+	}
+	setLimits.EphemeralStorageLimitMax = lookupEnvOrEmpty("EPHEMERAL_STORAGE_MAX")
+	if setLimits.EphemeralStorageLimitMax == "" || len(strings.TrimSpace(setLimits.EphemeralStorageLimitMax)) == 0 {
+		logrus.Fatal("Environment variable EPHEMERAL_STORAGE_MAX is not set or empty: ", setLimits.EphemeralStorageLimitMax)
+	}
 
 	logrus.Info("Starting Namespace-Watcher with the following parameters:")
 	logrus.Info("CPU_LIMIT_MIN ", setLimits.CpuLimitMin)
