@@ -21,13 +21,11 @@ namespace-watcher, will not add limits to:
 - ```kube-node-lease```
 - ```default```
 
+Additional namespaces can be exluded setting the env var ```EXCLUDED_NAMESPACES``` as shown in the ```deployment.yaml```. Thie is a list of string comma (```,```) separated.
+
 ## Deployment
 
 The necessary serviceaccount, ClusterRole and ClusterRoleBinding are created in the manifest ```deployment.yaml``` to allow namespace-watcher to observe and update namespaces.
 download the manifest deployment.yaml and run:
 ```kubectl apply -f deployment.yaml```
 namespace-watcher will be deployed in the ```kube-system``` namespace.
-
-## ToDo (future release)
-
-- Implement namespace exclusion for user.

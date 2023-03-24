@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -15,7 +16,7 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-const version = "v1.0-alpha8"
+const version = "v1.0-alpha9"
 
 type Limits struct {
 	CpuLimitMax              string
@@ -174,6 +175,25 @@ func main() {
 		os.Exit(1)
 	}
 
+	// create a set to store excluded namespaces
+	excludedNamespaces := mapset.NewSet[string]()
+	excludedNamespaces.Add("default")
+	excludedNamespaces.Add("cattle")
+	excludedNamespaces.Add("kube-system")
+	excludedNamespaces.Add("kube-public")
+	excludedNamespaces.Add("istio-system")
+	excludedNamespaces.Add("kube-node-lease")
+	excludedNamespaces.Add("kube-local")
+
+	// read additional excluded namespaces from the environment variable
+	additionalExcluded := lookupEnvOrEmpty("EXCLUDED_NAMESPACES")
+	if additionalExcluded != "" {
+		additionalExcludedList := strings.Split(additionalExcluded, ",")
+		for _, ns := range additionalExcludedList {
+			excludedNamespaces.Add(strings.TrimSpace(ns))
+		}
+	}
+
 	// process events
 	for event := range watcher.ResultChan() {
 		// check if event is a namespace creation event
@@ -181,16 +201,8 @@ func main() {
 			// print namespace name to STDOUT
 			namespaceName := event.Object.(*corev1.Namespace).ObjectMeta.Name
 
-			//exclude cattle and system namespaces
-			if strings.Contains(namespaceName, "default") {
-				logrus.Info("Skipping namespace ", namespaceName)
-				continue
-			}
-			if strings.Contains(namespaceName, "cattle") || strings.Contains(namespaceName, "kube-system") || strings.Contains(namespaceName, "kube-public") {
-				logrus.Info("Skipping namespace ", namespaceName)
-				continue
-			}
-			if strings.Contains(namespaceName, "istio-system") || strings.Contains(namespaceName, "kube-node-lease") || strings.Contains(namespaceName, "kube-local") {
+			// check if namespace is in the excluded set
+			if excludedNamespaces.Contains(namespaceName) {
 				logrus.Info("Skipping namespace ", namespaceName)
 				continue
 			}

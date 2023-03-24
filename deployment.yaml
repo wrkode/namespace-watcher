@@ -45,8 +45,10 @@ spec:
     spec:
       containers:
       - name: namespace-watcher
-        image: wrkode/namespace-watcher:v1.0-alpha8
+        image: wrkode/namespace-watcher:v1.0-alpha9
         env:
+        - name: EXCLUDED_NAMESPACES
+          value: "namespace1,namespace2,namespace3"
         - name: CPU_LIMIT_MAX
           value: "700m"
         - name: MEM_LIMIT_MAX
