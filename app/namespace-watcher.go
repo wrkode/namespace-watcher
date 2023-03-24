@@ -14,7 +14,7 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-const version = "v1.0-alpha"
+const version = "v1.0-alpha6"
 
 type Limits struct {
 	CpuLimitMax              string
@@ -27,53 +27,36 @@ type Limits struct {
 
 var setLimits Limits
 
-/*
-func readLimit() *Limits {
-
-	cpuLimitMax := Limits{CpuLimitMax: os.Getenv("CPU_LIMIT_MAX")}
-	memoryLimitMax := Limits{MemLimitMax: os.Getenv("MEM_LIMIT_MAX")}
-	ephemeralStorageLimitMax := Limits{EphemeralStorageLimitMax: os.Getenv("EPHEMERAL_STORAGE_MAX")}
-
-	cpuLimitMin := Limits{CpuLimitMin: os.Getenv("CPU_LIMIT_MIN")}
-	memoryLimitMin := Limits{MemLimitMin: os.Getenv("MEM_LIMIT_MIN")}
-	ephemeralStorageLimitMin := Limits{EphemeralStorageLimitMin: os.Getenv("EPHEMERAL_STORAGE_MIN")}
-
-	return &Limits
-
-}
-*/
 func createLimitRange(clientset *kubernetes.Clientset, namespaceName string, limits Limits) error {
-
-	//var log = logrus.New()
 
 	cpuLimitMin, err := resource.ParseQuantity(limits.CpuLimitMin)
 	if err != nil {
-		logrus.Fatalf("error parsing CPU_LIMIT_MIN %v:", err)
+		logrus.Fatalf("error parsing CPU_LIMIT_MIN: ", err)
 	}
 
 	cpuLimitMax, err := resource.ParseQuantity(limits.CpuLimitMax)
 	if err != nil {
-		logrus.Fatalf("error parsing CPU_LIMIT_MAX %v:", err)
+		logrus.Fatalf("error parsing CPU_LIMIT_MAX :", err)
 	}
 
 	memLimtMin, err := resource.ParseQuantity(limits.MemLimitMin)
 	if err != nil {
-		logrus.Fatalf("error parsing MEM_LIMIT_MIN %v:", err)
+		logrus.Fatalf("error parsing MEM_LIMIT_MIN: ", err)
 	}
 
 	memLimtMax, err := resource.ParseQuantity(limits.MemLimitMax)
 	if err != nil {
-		logrus.Fatalf("error parsing MEM_LIMIT_MAX %v:", err)
+		logrus.Fatalf("error parsing MEM_LIMIT_MAX: ", err)
 	}
 
 	ephemeralStorageMin, err := resource.ParseQuantity(limits.EphemeralStorageLimitMin)
 	if err != nil {
-		logrus.Fatalf("error parsing EPHEMERAL_STORAGE_MIN %v:", err)
+		logrus.Fatalf("error parsing EPHEMERAL_STORAGE_MIN: ", err)
 	}
 
 	ephemeralStorageMax, err := resource.ParseQuantity(limits.EphemeralStorageLimitMax)
 	if err != nil {
-		logrus.Fatalf("error parsing EPHEMERAL_STORAGE_MAX %v:", err)
+		logrus.Fatalf("error parsing EPHEMERAL_STORAGE_MAX: ", err)
 	}
 
 	limitRange := &corev1.LimitRange{
@@ -104,45 +87,45 @@ func createLimitRange(clientset *kubernetes.Clientset, namespaceName string, lim
 		return err
 	}
 
-	logrus.Warn("Created LimitRange for namespace %s\n", namespaceName)
+	logrus.Warn("Created LimitRange for namespace: ", namespaceName)
 	return nil
 }
 
 func main() {
 
-	logrus.Info("Namespace-Watcher version %s\n", version)
+	logrus.Info("Namespace-Watcher version ", version)
 
-	setLimits.CpuLimitMax = os.Getenv("CPU_LIMIT_MAX")
-	setLimits.MemLimitMax = os.Getenv("CPU_LIMIT_MAX")
-	setLimits.EphemeralStorageLimitMax = os.Getenv("EPHEMERAL_STORAGE_MAX")
 	setLimits.CpuLimitMin = os.Getenv("CPU_LIMIT_MIN")
+	setLimits.CpuLimitMax = os.Getenv("CPU_LIMIT_MAX")
 	setLimits.MemLimitMin = os.Getenv("MEM_LIMIT_MIN")
+	setLimits.MemLimitMax = os.Getenv("MEM_LIMIT_MAX")
 	setLimits.EphemeralStorageLimitMin = os.Getenv("EPHEMERAL_STORAGE_MIN")
+	setLimits.EphemeralStorageLimitMax = os.Getenv("EPHEMERAL_STORAGE_MAX")
 
-	logrus.Info("Starting Namespace-Watcher with the folling parameters:")
-	logrus.Info("CPU_LIMIT_MIN %s\n", setLimits.CpuLimitMin)
-	logrus.Info("CPU_LIMIT_MAX %s\n", setLimits.CpuLimitMax)
-	logrus.Info("MEM_LIMIT_MIN %s\n", setLimits.MemLimitMin)
-	logrus.Info("MEM_LIMIT_MAX %s\n", setLimits.MemLimitMax)
-	logrus.Info("EPHEMERAL_STORAGE_MIN %s\n", setLimits.EphemeralStorageLimitMin)
-	logrus.Info("EPHEMERAL_STORAGE_MAX %s\n", setLimits.EphemeralStorageLimitMax)
+	logrus.Info("Starting Namespace-Watcher with the following parameters:")
+	logrus.Info("CPU_LIMIT_MIN ", setLimits.CpuLimitMin)
+	logrus.Info("CPU_LIMIT_MAX ", setLimits.CpuLimitMax)
+	logrus.Info("MEM_LIMIT_MIN ", setLimits.MemLimitMin)
+	logrus.Info("MEM_LIMIT_MAX ", setLimits.MemLimitMax)
+	logrus.Info("EPHEMERAL_STORAGE_MIN ", setLimits.EphemeralStorageLimitMin)
+	logrus.Info("EPHEMERAL_STORAGE_MAX ", setLimits.EphemeralStorageLimitMax)
 
 	// create Kubernetes API client
 	config, err := rest.InClusterConfig()
 	if err != nil {
-		logrus.Fatal("Failed to get Kubernetes config:", err)
+		logrus.Fatal("Failed to get Kubernetes config: ", err)
 		os.Exit(1)
 	}
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		logrus.Fatal("Failed to create Kubernetes client:", err)
+		logrus.Fatal("Failed to create Kubernetes client: ", err)
 		os.Exit(1)
 	}
 
 	// watch for namespace creation events
 	watcher, err := clientset.CoreV1().Namespaces().Watch(context.Background(), metav1.ListOptions{})
 	if err != nil {
-		logrus.Fatal("Failed to watch namespaces:", err)
+		logrus.Fatal("Failed to watch namespaces: ", err)
 		os.Exit(1)
 	}
 
@@ -155,24 +138,24 @@ func main() {
 
 			//exclude cattle and system namespaces
 			if strings.Contains(namespaceName, "default") {
-				logrus.Info("Skipping namespace %s\n", namespaceName)
+				logrus.Info("Skipping namespace ", namespaceName)
 				continue
 			}
 			if strings.Contains(namespaceName, "cattle") || strings.Contains(namespaceName, "kube-system") || strings.Contains(namespaceName, "kube-public") {
-				logrus.Info("Skipping namespace %s\n", namespaceName)
+				logrus.Info("Skipping namespace ", namespaceName)
 				continue
 			}
 			if strings.Contains(namespaceName, "istio-system") || strings.Contains(namespaceName, "kube-node-lease") || strings.Contains(namespaceName, "kube-local") {
-				logrus.Info("Skipping namespace %s\n", namespaceName)
+				logrus.Info("Skipping namespace ", namespaceName)
 				continue
 			}
 
-			logrus.Info("New namespace created: %s\n", namespaceName)
+			logrus.Info("New namespace created: ", namespaceName)
 
 			// create a LimitRange for the new namespace
 			err := createLimitRange(clientset, namespaceName, setLimits)
 			if err != nil {
-				logrus.Fatal("Failed to create LimitRange for namespace %s: %v\n", namespaceName, err)
+				logrus.Warn("Failed to create LimitRange for namespace: ", namespaceName, " ", err)
 			}
 		}
 	}
