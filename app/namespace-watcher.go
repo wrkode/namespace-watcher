@@ -2,11 +2,10 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"log"
 	"os"
 	"strings"
 
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,9 +14,9 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-func createLimitRange(clientset *kubernetes.Clientset, namespaceName string) error {
+const version = "v1.0-alpha"
 
-	version := "v1.0-alpha"
+func createLimitRange(clientset *kubernetes.Clientset, namespaceName string) error {
 
 	cpuLimitMax := os.Getenv("CPU_LIMIT_MAX")
 	memoryLimitMax := os.Getenv("MEM_LIMIT_MAX")
@@ -26,15 +25,14 @@ func createLimitRange(clientset *kubernetes.Clientset, namespaceName string) err
 	cpuLimitMin := os.Getenv("CPU_LIMIT_MIN")
 	memoryLimitMin := os.Getenv("MEM_LIMIT_MIN")
 	ephemeralStorageLimitMin := os.Getenv("EPHEMERAL_STORAGE_MIN")
-	log.Printf("Namespace-Watcher version %s\n", version)
 
-	log.Println("Starting Namespace-Watcher with the folling parameters:")
-	log.Printf("CPU_LIMIT_MAX %s\n", cpuLimitMax)
-	log.Printf("CPU_LIMIT_MIN %s\n", cpuLimitMin)
-	log.Printf("MEM_LIMIT_MAX %s\n", memoryLimitMax)
-	log.Printf("MEM_LIMIT_MAX %s\n", memoryLimitMin)
-	log.Printf("EPHEMERAL_STORAGE_MAX %s\n", ephemeralStorageLimitMax)
-	log.Printf("EPHEMERAL_STORAGE_MAX %s\n", ephemeralStorageLimitMin)
+	logrus.Info("Starting Namespace-Watcher with the folling parameters:")
+	logrus.Info("CPU_LIMIT_MAX %s\n", cpuLimitMax)
+	logrus.Info("CPU_LIMIT_MIN %s\n", cpuLimitMin)
+	logrus.Info("MEM_LIMIT_MAX %s\n", memoryLimitMax)
+	logrus.Info("MEM_LIMIT_MAX %s\n", memoryLimitMin)
+	logrus.Info("EPHEMERAL_STORAGE_MAX %s\n", ephemeralStorageLimitMax)
+	logrus.Info("EPHEMERAL_STORAGE_MAX %s\n", ephemeralStorageLimitMin)
 
 	limitRange := &corev1.LimitRange{
 		ObjectMeta: metav1.ObjectMeta{
@@ -64,28 +62,30 @@ func createLimitRange(clientset *kubernetes.Clientset, namespaceName string) err
 		return err
 	}
 
-	fmt.Printf("Created LimitRange for namespace %s\n", namespaceName)
+	logrus.Warn("Created LimitRange for namespace %s\n", namespaceName)
 	return nil
 }
 
 func main() {
 
+	logrus.Info("Namespace-Watcher version %s\n", version)
+
 	// create Kubernetes API client
 	config, err := rest.InClusterConfig()
 	if err != nil {
-		fmt.Println("Failed to get Kubernetes config:", err)
+		logrus.Fatal("Failed to get Kubernetes config:", err)
 		os.Exit(1)
 	}
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		fmt.Println("Failed to create Kubernetes client:", err)
+		logrus.Fatal("Failed to create Kubernetes client:", err)
 		os.Exit(1)
 	}
 
 	// watch for namespace creation events
 	watcher, err := clientset.CoreV1().Namespaces().Watch(context.Background(), metav1.ListOptions{})
 	if err != nil {
-		fmt.Println("Failed to watch namespaces:", err)
+		logrus.Fatal("Failed to watch namespaces:", err)
 		os.Exit(1)
 	}
 
@@ -98,24 +98,24 @@ func main() {
 
 			//exclude cattle and system namespaces
 			if strings.Contains(namespaceName, "default") {
-				log.Printf("Skipping namespace %s\n", namespaceName)
+				logrus.Info("Skipping namespace %s\n", namespaceName)
 				continue
 			}
 			if strings.Contains(namespaceName, "cattle") || strings.Contains(namespaceName, "kube-system") || strings.Contains(namespaceName, "kube-public") {
-				log.Printf("Skipping namespace %s\n", namespaceName)
+				logrus.Info("Skipping namespace %s\n", namespaceName)
 				continue
 			}
 			if strings.Contains(namespaceName, "istio-system") || strings.Contains(namespaceName, "kube-node-lease") || strings.Contains(namespaceName, "kube-local") {
-				log.Printf("Skipping namespace %s\n", namespaceName)
+				logrus.Info("Skipping namespace %s\n", namespaceName)
 				continue
 			}
 
-			fmt.Printf("New namespace created: %s\n", namespaceName)
+			logrus.Info("New namespace created: %s\n", namespaceName)
 
 			// create a LimitRange for the new namespace
 			err := createLimitRange(clientset, namespaceName)
 			if err != nil {
-				fmt.Printf("Failed to create LimitRange for namespace %s: %v\n", namespaceName, err)
+				logrus.Fatal("Failed to create LimitRange for namespace %s: %v\n", namespaceName, err)
 			}
 		}
 	}
