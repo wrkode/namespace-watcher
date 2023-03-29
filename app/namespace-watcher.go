@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -15,7 +17,7 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-const version = "v1.0-alpha13"
+const version = "v1.0-alpha14"
 
 type Limits struct {
 	CpuLimitMax              resource.Quantity
@@ -81,27 +83,18 @@ func createOrUpdateLimitRange(clientset *kubernetes.Clientset, namespaceName str
 	return nil
 }
 
-func lookupEnvOrEmpty(key string) resource.Quantity {
+func lookupEnvOrEmpty(key string) (resource.Quantity, error) {
 	value, exists := os.LookupEnv(key)
 	if !exists || len(strings.TrimSpace(value)) == 0 {
-		logrus.Error("Environment variable ", key, " is not set or empty: ", value)
-		return resource.Quantity{}
+		logrus.Errorf("Environment variable %s is not set or empty: %s", key, value)
+		return resource.Quantity{}, fmt.Errorf("environment variable %s is not set or empty", key)
 	}
 	q, err := resource.ParseQuantity(value)
 	if err != nil {
-		logrus.Error("Error parsing ", key, ": ", err)
-		return resource.Quantity{}
+		logrus.Errorf("Error parsing %s: %v", key, err)
+		return resource.Quantity{}, fmt.Errorf("error parsing %s: %v", key, err)
 	}
-	return q
-}
-
-func shouldExcludeNamespace(namespaceName string, excludedNamespaces map[string]struct{}) bool {
-	if strings.Contains(namespaceName, "cattle") {
-		return true
-	}
-
-	_, isExcluded := excludedNamespaces[namespaceName]
-	return isExcluded
+	return q, nil
 }
 
 func main() {
@@ -118,9 +111,9 @@ func main() {
 
 	// Loop through the environment variables, parse and set the limits
 	for key, limit := range envVars {
-		parsedLimit := lookupEnvOrEmpty(key)
-		if parsedLimit.IsZero() {
-			logrus.Fatal("Invalid value for ", key)
+		parsedLimit, err := lookupEnvOrEmpty(key)
+		if err != nil || parsedLimit.IsZero() {
+			logrus.Fatal("Invalid value for ", key, ": ", err)
 		}
 		*limit = parsedLimit
 	}
@@ -152,22 +145,21 @@ func main() {
 	}
 
 	// create a set to store excluded namespaces
-	excludedNamespaces := map[string]struct{}{
-		"default":         {},
-		"cattle":          {},
-		"kube-system":     {},
-		"kube-public":     {},
-		"istio-system":    {},
-		"kube-node-lease": {},
-		"kube-local":      {},
-	}
+	excludedNamespaces := mapset.NewSet[string]()
+	excludedNamespaces.Add("default")
+	excludedNamespaces.Add("cattle")
+	excludedNamespaces.Add("kube-system")
+	excludedNamespaces.Add("kube-public")
+	excludedNamespaces.Add("istio-system")
+	excludedNamespaces.Add("kube-node-lease")
+	excludedNamespaces.Add("kube-local")
 
 	// read additional excluded namespaces from the environment variable
 	additionalExcluded := os.Getenv("EXCLUDED_NAMESPACES")
 	if additionalExcluded != "" {
 		additionalExcludedList := strings.Split(additionalExcluded, ",")
 		for _, ns := range additionalExcludedList {
-			excludedNamespaces[strings.TrimSpace(ns)] = struct{}{}
+			excludedNamespaces.Add(strings.TrimSpace(ns))
 		}
 	}
 
@@ -178,7 +170,8 @@ func main() {
 			namespaceName := event.Object.(*corev1.Namespace).ObjectMeta.Name
 
 			// check if namespace is in the excluded set or if it contains word "cattle"
-			isExcluded := shouldExcludeNamespace(namespaceName, excludedNamespaces)
+			isExcluded := strings.Contains(namespaceName, "cattle") || excludedNamespaces.Contains(namespaceName)
+
 			if isExcluded {
 				logrus.Info("Checking if namespace should be skipped: ", namespaceName, " - Excluded: ", isExcluded)
 				logrus.Info("Skipping namespace ", namespaceName)
@@ -190,7 +183,7 @@ func main() {
 			// create a LimitRange for the new namespace
 			err := createOrUpdateLimitRange(clientset, namespaceName, setLimits)
 			if err != nil {
-				logrus.Warn("Failed to create LimitRange for namespace: ", namespaceName, " ", err)
+				logrus.Error("Failed to create LimitRange for namespace: ", namespaceName, " ", err)
 			}
 		}
 	}

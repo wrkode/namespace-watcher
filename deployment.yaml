@@ -45,7 +45,7 @@ spec:
     spec:
       containers:
       - name: namespace-watcher
-        image: wrkode/namespace-watcher:v1.0-alpha13
+        image: wrkode/namespace-watcher:v1.0-alpha14
         env:
         - name: EXCLUDED_NAMESPACES
           value: "namespace1,namespace2,namespace3"
