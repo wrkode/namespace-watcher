@@ -17,7 +17,7 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-const version = "v1.0-alpha14"
+const version = "v1.0-beta"
 
 type Limits struct {
 	CpuLimitMax              resource.Quantity
@@ -147,7 +147,7 @@ func main() {
 	// create a set to store excluded namespaces
 	excludedNamespaces := mapset.NewSet[string]()
 	excludedNamespaces.Add("default")
-	excludedNamespaces.Add("cattle")
+	excludedNamespaces.Add("local")
 	excludedNamespaces.Add("kube-system")
 	excludedNamespaces.Add("kube-public")
 	excludedNamespaces.Add("istio-system")

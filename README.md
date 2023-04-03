@@ -20,6 +20,7 @@ namespace-watcher, will not add limits to:
 - ```kube-local```
 - ```kube-node-lease```
 - ```default```
+- ```local```
 
 Additional namespaces can be exluded setting the env var ```EXCLUDED_NAMESPACES``` as shown in the ```deployment.yaml```. Thie is a list of string comma (```,```) separated.
 
