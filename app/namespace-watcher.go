@@ -3,11 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 
+	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
@@ -15,26 +17,20 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-func createLimitRange(clientset *kubernetes.Clientset, namespaceName string) error {
+const version = "v1.0-beta"
 
-	version := "v1.0-alpha"
+type Limits struct {
+	CpuLimitMax              resource.Quantity
+	MemLimitMax              resource.Quantity
+	EphemeralStorageLimitMax resource.Quantity
+	CpuLimitMin              resource.Quantity
+	MemLimitMin              resource.Quantity
+	EphemeralStorageLimitMin resource.Quantity
+}
 
-	cpuLimitMax := os.Getenv("CPU_LIMIT_MAX")
-	memoryLimitMax := os.Getenv("MEM_LIMIT_MAX")
-	ephemeralStorageLimitMax := os.Getenv("EPHEMERAL_STORAGE_MAX")
+var setLimits Limits
 
-	cpuLimitMin := os.Getenv("CPU_LIMIT_MIN")
-	memoryLimitMin := os.Getenv("MEM_LIMIT_MIN")
-	ephemeralStorageLimitMin := os.Getenv("EPHEMERAL_STORAGE_MIN")
-	log.Printf("Namespace-Watcher version %s\n", version)
-
-	log.Println("Starting Namespace-Watcher with the folling parameters:")
-	log.Printf("CPU_LIMIT_MAX %s\n", cpuLimitMax)
-	log.Printf("CPU_LIMIT_MIN %s\n", cpuLimitMin)
-	log.Printf("MEM_LIMIT_MAX %s\n", memoryLimitMax)
-	log.Printf("MEM_LIMIT_MAX %s\n", memoryLimitMin)
-	log.Printf("EPHEMERAL_STORAGE_MAX %s\n", ephemeralStorageLimitMax)
-	log.Printf("EPHEMERAL_STORAGE_MAX %s\n", ephemeralStorageLimitMin)
+func createOrUpdateLimitRange(clientset *kubernetes.Clientset, namespaceName string, limits Limits) error {
 
 	limitRange := &corev1.LimitRange{
 		ObjectMeta: metav1.ObjectMeta{
@@ -45,77 +41,149 @@ func createLimitRange(clientset *kubernetes.Clientset, namespaceName string) err
 				{
 					Type: corev1.LimitTypePod,
 					Max: corev1.ResourceList{
-						corev1.ResourceCPU:              resource.MustParse(cpuLimitMax),
-						corev1.ResourceMemory:           resource.MustParse(memoryLimitMax),
-						corev1.ResourceEphemeralStorage: resource.MustParse(ephemeralStorageLimitMax),
+						corev1.ResourceCPU:              limits.CpuLimitMax,
+						corev1.ResourceMemory:           limits.MemLimitMax,
+						corev1.ResourceEphemeralStorage: limits.EphemeralStorageLimitMax,
 					},
 					Min: corev1.ResourceList{
-						corev1.ResourceCPU:              resource.MustParse(cpuLimitMin),
-						corev1.ResourceMemory:           resource.MustParse(memoryLimitMin),
-						corev1.ResourceEphemeralStorage: resource.MustParse(ephemeralStorageLimitMin),
+						corev1.ResourceCPU:              limits.CpuLimitMin,
+						corev1.ResourceMemory:           limits.MemLimitMin,
+						corev1.ResourceEphemeralStorage: limits.EphemeralStorageLimitMin,
 					},
 				},
 			},
 		},
 	}
 
-	_, err := clientset.CoreV1().LimitRanges(namespaceName).Create(context.Background(), limitRange, metav1.CreateOptions{})
+	// Get the existing LimitRange
+	existingLimitRange, err := clientset.CoreV1().LimitRanges(namespaceName).Get(context.Background(), limitRange.ObjectMeta.Name, metav1.GetOptions{})
 	if err != nil {
-		return err
+		if errors.IsNotFound(err) {
+
+			//Create LimitRange if it doesn't exist
+			_, err = clientset.CoreV1().LimitRanges(namespaceName).Create(context.Background(), limitRange, metav1.CreateOptions{})
+			if err != nil {
+				return err
+			}
+			logrus.Info("Created LimitRange for namespace: ", namespaceName)
+		} else {
+			return err
+
+		}
+	} else {
+		// Update the existing LimitRange
+		existingLimitRange.Spec = limitRange.Spec
+		_, err = clientset.CoreV1().LimitRanges(namespaceName).Update(context.Background(), existingLimitRange, metav1.UpdateOptions{})
+		if err != nil {
+			return err
+		}
+		logrus.Info("Updated LimitRange for namespace: ", namespaceName)
 	}
 
-	fmt.Printf("Created LimitRange for namespace %s\n", namespaceName)
 	return nil
+}
+
+func lookupEnvOrEmpty(key string) (resource.Quantity, error) {
+	value, exists := os.LookupEnv(key)
+	if !exists || len(strings.TrimSpace(value)) == 0 {
+		logrus.Errorf("Environment variable %s is not set or empty: %s", key, value)
+		return resource.Quantity{}, fmt.Errorf("environment variable %s is not set or empty", key)
+	}
+	q, err := resource.ParseQuantity(value)
+	if err != nil {
+		logrus.Errorf("Error parsing %s: %v", key, err)
+		return resource.Quantity{}, fmt.Errorf("error parsing %s: %v", key, err)
+	}
+	return q, nil
 }
 
 func main() {
 
+	// Define a map for environment variables and their corresponding limits
+	envVars := map[string]*resource.Quantity{
+		"CPU_LIMIT_MIN":         &setLimits.CpuLimitMin,
+		"CPU_LIMIT_MAX":         &setLimits.CpuLimitMax,
+		"MEM_LIMIT_MIN":         &setLimits.MemLimitMin,
+		"MEM_LIMIT_MAX":         &setLimits.MemLimitMax,
+		"EPHEMERAL_STORAGE_MIN": &setLimits.EphemeralStorageLimitMin,
+		"EPHEMERAL_STORAGE_MAX": &setLimits.EphemeralStorageLimitMax,
+	}
+
+	// Loop through the environment variables, parse and set the limits
+	for key, limit := range envVars {
+		parsedLimit, err := lookupEnvOrEmpty(key)
+		if err != nil || parsedLimit.IsZero() {
+			logrus.Fatal("Invalid value for ", key, ": ", err)
+		}
+		*limit = parsedLimit
+	}
+
+	logrus.Info("Namespace-Watcher version ", version)
+	logrus.Info("Starting Namespace-Watcher with the following parameters:")
+	logrus.Info("CPU_LIMIT_MIN ", setLimits.CpuLimitMin)
+	logrus.Info("CPU_LIMIT_MAX ", setLimits.CpuLimitMax)
+	logrus.Info("MEM_LIMIT_MIN ", setLimits.MemLimitMin)
+	logrus.Info("MEM_LIMIT_MAX ", setLimits.MemLimitMax)
+	logrus.Info("EPHEMERAL_STORAGE_MIN ", setLimits.EphemeralStorageLimitMin)
+	logrus.Info("EPHEMERAL_STORAGE_MAX ", setLimits.EphemeralStorageLimitMax)
+
 	// create Kubernetes API client
 	config, err := rest.InClusterConfig()
 	if err != nil {
-		fmt.Println("Failed to get Kubernetes config:", err)
-		os.Exit(1)
+		logrus.Fatal("Failed to get Kubernetes config: ", err)
 	}
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		fmt.Println("Failed to create Kubernetes client:", err)
-		os.Exit(1)
+		logrus.Fatal("Failed to create Kubernetes client: ", err)
 	}
 
 	// watch for namespace creation events
 	watcher, err := clientset.CoreV1().Namespaces().Watch(context.Background(), metav1.ListOptions{})
 	if err != nil {
-		fmt.Println("Failed to watch namespaces:", err)
-		os.Exit(1)
+		logrus.Fatal("Failed to watch namespaces: ", err)
+
+	}
+
+	// create a set to store excluded namespaces
+	excludedNamespaces := mapset.NewSet[string]()
+	excludedNamespaces.Add("default")
+	excludedNamespaces.Add("local")
+	excludedNamespaces.Add("kube-system")
+	excludedNamespaces.Add("kube-public")
+	excludedNamespaces.Add("istio-system")
+	excludedNamespaces.Add("kube-node-lease")
+	excludedNamespaces.Add("kube-local")
+
+	// read additional excluded namespaces from the environment variable
+	additionalExcluded := os.Getenv("EXCLUDED_NAMESPACES")
+	if additionalExcluded != "" {
+		additionalExcludedList := strings.Split(additionalExcluded, ",")
+		for _, ns := range additionalExcludedList {
+			excludedNamespaces.Add(strings.TrimSpace(ns))
+		}
 	}
 
 	// process events
 	for event := range watcher.ResultChan() {
 		// check if event is a namespace creation event
 		if event.Type == watch.Added {
-			// print namespace name to STDOUT
 			namespaceName := event.Object.(*corev1.Namespace).ObjectMeta.Name
 
-			//exclude cattle and system namespaces
-			if strings.Contains(namespaceName, "default") {
-				log.Printf("Skipping namespace %s\n", namespaceName)
-				continue
-			}
-			if strings.Contains(namespaceName, "cattle") || strings.Contains(namespaceName, "kube-system") || strings.Contains(namespaceName, "kube-public") {
-				log.Printf("Skipping namespace %s\n", namespaceName)
-				continue
-			}
-			if strings.Contains(namespaceName, "istio-system") || strings.Contains(namespaceName, "kube-public") || strings.Contains(namespaceName, "kube-local") {
-				log.Printf("Skipping namespace %s\n", namespaceName)
+			// check if namespace is in the excluded set or if it contains word "cattle"
+			isExcluded := strings.Contains(namespaceName, "cattle") || excludedNamespaces.Contains(namespaceName)
+
+			if isExcluded {
+				logrus.Info("Checking if namespace should be skipped: ", namespaceName, " - Excluded: ", isExcluded)
+				logrus.Info("Skipping namespace ", namespaceName)
 				continue
 			}
 
-			fmt.Printf("New namespace created: %s\n", namespaceName)
+			logrus.Info("New namespace created: ", namespaceName)
 
 			// create a LimitRange for the new namespace
-			err := createLimitRange(clientset, namespaceName)
+			err := createOrUpdateLimitRange(clientset, namespaceName, setLimits)
 			if err != nil {
-				fmt.Printf("Failed to create LimitRange for namespace %s: %v\n", namespaceName, err)
+				logrus.Error("Failed to create LimitRange for namespace: ", namespaceName, " ", err)
 			}
 		}
 	}

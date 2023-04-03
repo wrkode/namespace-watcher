@@ -1,8 +1,10 @@
-module github.com/wrkode/watcher
+module github.com/wrkode/namespace-watcher
 
 go 1.19
 
 require (
+	github.com/deckarep/golang-set/v2 v2.3.0
+	github.com/sirupsen/logrus v1.9.0
 	k8s.io/api v0.26.2
 	k8s.io/apimachinery v0.26.2
 	k8s.io/client-go v0.26.2
